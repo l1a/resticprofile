@@ -286,3 +286,77 @@ func TestCloseHandlerRunsDaemonReload(t *testing.T) {
 	handler.addReloadHook(systemd.UserUnit)
 	handler.Close()
 }
+
+func TestCheckPermission(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		permission Permission
+		euid       int
+		expected   bool
+	}{
+		{
+			name:       "PermissionUserLoggedOn",
+			permission: PermissionUserLoggedOn,
+			euid:       1000,  // non-root user
+			expected:   false, // since linger is likely not enabled in test
+		},
+		{
+			name:       "PermissionUserBackground",
+			permission: PermissionUserBackground,
+			euid:       1000,  // non-root user
+			expected:   false, // not root
+		},
+		{
+			name:       "PermissionSystem as root",
+			permission: PermissionSystem,
+			euid:       0, // root user
+			expected:   true,
+		},
+		{
+			name:       "PermissionSystem as non-root",
+			permission: PermissionSystem,
+			euid:       1000, // non-root user
+			expected:   false,
+		},
+		{
+			name:       "Undefined permission as root",
+			permission: PermissionFromConfig("undefined"),
+			euid:       0, // root user
+			expected:   true,
+		},
+		{
+			name:       "Undefined permission as non-root",
+			permission: PermissionFromConfig("undefined"),
+			euid:       1000, // non-root user
+			expected:   false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			user := user.User{
+				Uid:      tc.euid,
+				Username: "testuser",
+			}
+
+			handler := NewHandler(SchedulerSystemd{}).(*HandlerSystemd)
+			result := handler.CheckPermission(user, tc.permission)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestIsLingerEnabled(t *testing.T) {
+	t.Parallel()
+
+	// Test with a likely invalid user to ensure it handles errors gracefully
+	_, err := isLingerEnabled("nonexistentuser")
+	assert.Error(t, err) // Expect error since user doesn't exist
+
+	// For a real user, test might pass or fail depending on linger status
+	// Here, we skip detailed testing to avoid dependency on system state
+}

@@ -343,8 +343,13 @@ func (h *HandlerSystemd) DetectSchedulePermission(p Permission) (Permission, boo
 func (h *HandlerSystemd) CheckPermission(user user.User, p Permission) bool {
 	switch p {
 	case PermissionUserLoggedOn:
-		// user mode is always available
-		return true
+		// user mode requires linger to be enabled
+		linger, err := isLingerEnabled(user.Username)
+		if err != nil {
+			clog.Warningf("cannot check linger status for user %s: %v", user.Username, err)
+			return false
+		}
+		return linger
 
 	default:
 		if user.IsRoot() {
@@ -354,6 +359,15 @@ func (h *HandlerSystemd) CheckPermission(user user.User, p Permission) bool {
 		return false
 
 	}
+}
+
+func isLingerEnabled(username string) (bool, error) {
+	cmd := exec.Command("loginctl", "show-user", username, "--property=Linger", "--value")
+	output, err := cmd.Output()
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(string(output)) == "yes", nil
 }
 
 func (h *HandlerSystemd) addReloadHook(unitType systemd.UnitType) {
