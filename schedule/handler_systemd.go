@@ -389,22 +389,30 @@ var (
 	_ Handler = &HandlerSystemd{}
 )
 
+// permissionToSystemd translates the internal Permission type into the corresponding
+// systemd.UnitType. This is the critical function that determines whether a
+// system-level (`/etc/systemd/system`) or user-level (`~/.config/systemd/user`)
+// service will be created.
 func permissionToSystemd(user user.User, permission Permission) (systemd.UnitType, string) {
 	switch permission {
 	case PermissionSystem:
+		// A system-level job is explicitly requested.
 		return systemd.SystemUnit, ""
 
-	case PermissionUserBackground:
-		return systemd.SystemUnit, user.Username
-
-	case PermissionUserLoggedOn:
+	case PermissionUserBackground, PermissionUserLoggedOn:
+		// A user-level job is requested (either "user" or "user_logged_on").
+		// This is the key fix: both must map to a UserUnit to ensure files are
+		// created in the user's home directory and managed by `systemctl --user`.
 		return systemd.UserUnit, ""
 
-	default:
+	default: // This case handles PermissionAuto.
+		// When permission is "auto", the type of unit depends on who is running the command.
 		unitType := systemd.UserUnit
-		if user.Uid == 0 {
+		// If the command is run as root (e.g., with sudo), create a system-level service.
+		if user.IsRoot() {
 			unitType = systemd.SystemUnit
 		}
+		// Otherwise, create a user-level service.
 		return unitType, ""
 	}
 }
