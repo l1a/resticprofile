@@ -11,6 +11,7 @@ import (
 
 	"github.com/creativeprojects/clog"
 	"github.com/creativeprojects/resticprofile/config"
+	"github.com/creativeprojects/resticprofile/schedule"
 	"github.com/creativeprojects/resticprofile/term"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -280,4 +281,63 @@ func TestCreateScheduleOverwriteExistingIntegrationUsingCrontab(t *testing.T) {
 	assert.Contains(t, output.String(), "Original form: *-*-* *:20,50:00")    // new one
 	assert.NotContains(t, output.String(), "Original form: *-*-* *:10,40:00") // previous one
 	t.Log(output.String())
+}
+
+const scheduleWithEnvVarConfiguration = `
+version: "2"
+
+profiles:
+  profile-with-env:
+    repository: .Env.MY_TEST_REPO
+    password-file: /tmp/pw
+    source: [/tmp]
+    backup:
+      schedule: "daily"
+`
+
+// TestCreateScheduleWithAutomaticEnvCapture verifies that when a profile is scheduled,
+// any .Env variables referenced within it are automatically detected, captured
+// from the environment, and injected into the schedule's configuration.
+func TestCreateScheduleWithAutomaticEnvCapture(t *testing.T) {
+	// 1. Setup: Create a temporary config file
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.yaml")
+	err := os.WriteFile(configFile, []byte(scheduleWithEnvVarConfiguration), 0600)
+	require.NoError(t, err)
+
+	// 2. Setup: Set environment variable for the test to capture
+	t.Setenv("MY_TEST_REPO", "/tmp/my-test-repository")
+
+	// 3. Mocking: Intercept the call to the scheduler to capture the job configuration
+	var capturedSchedules []*config.Schedule
+	originalScheduleJobs := scheduleJobs
+	scheduleJobs = func(handler schedule.Handler, jobs []*config.Schedule) error {
+		capturedSchedules = jobs
+		return nil
+	}
+	defer func() { scheduleJobs = originalScheduleJobs }()
+
+	// 4. Execution: Load config and run the createSchedule command
+	cfg, err := config.LoadFile(configFile, "")
+	require.NoError(t, err)
+	global, err := cfg.GetGlobalSection()
+	require.NoError(t, err)
+
+	ctx := commandContext{
+		Context: Context{
+			config: cfg,
+			global: global,
+			request: Request{
+				profile: "profile-with-env",
+			},
+		},
+	}
+	output := &bytes.Buffer{}
+	err = createSchedule(output, ctx)
+	require.NoError(t, err)
+
+	// 5. Assertions: Check that the captured schedule contains the environment variable
+	require.Len(t, capturedSchedules, 1, "Expected one schedule to be created")
+	schedule := capturedSchedules[0]
+	assert.Contains(t, schedule.Environment, "MY_TEST_REPO=/tmp/my-test-repository", "The captured environment variable was not found in the schedule's environment")
 }

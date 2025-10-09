@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 
 	"github.com/creativeprojects/clog"
 	"github.com/creativeprojects/resticprofile/config"
+	"github.com/creativeprojects/resticprofile/envscanner"
 	"github.com/creativeprojects/resticprofile/schedule"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -48,6 +50,35 @@ func createSchedule(_ io.Writer, ctx commandContext) error {
 		}
 		if err != nil {
 			return err
+		}
+
+		// Automatically scan the profile's configuration for any ".Env.VAR" references.
+		// This allows users to reference environment variables in their profiles and have them
+		// automatically injected into the scheduled job's environment without extra configuration.
+		varsToCapture, err := envscanner.ScanForEnvVariables(c.GetConfigFile(), profileName)
+		if err != nil {
+			// If scanning fails (e.g., file not found, invalid YAML), we log a warning but
+			// do not block the scheduling process. The schedule will be created without the
+			// automatically detected variables.
+			clog.Warningf("could not scan for environment variables in profile %s: %v", profileName, err)
+		}
+
+		if len(varsToCapture) > 0 {
+			clog.Infof("capturing environment variables for %s: %v", profileName, varsToCapture)
+			// Create a list of "KEY=VALUE" strings for the variables found.
+			capturedEnv := make([]string, 0, len(varsToCapture))
+			for _, varName := range varsToCapture {
+				// Look up the value of each variable from the current process's environment.
+				if value, ok := os.LookupEnv(varName); ok {
+					capturedEnv = append(capturedEnv, fmt.Sprintf("%s=%s", varName, value))
+				}
+			}
+
+			// Inject the captured environment variables into every job associated with this profile.
+			// This ensures that when the scheduled job runs, it has the necessary environment.
+			for id := range jobs {
+				jobs[id].Environment = append(jobs[id].Environment, capturedEnv...)
+			}
 		}
 
 		// add the no-start flag to all the jobs

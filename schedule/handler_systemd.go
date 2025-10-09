@@ -340,24 +340,33 @@ func (h *HandlerSystemd) DetectSchedulePermission(p Permission) (Permission, boo
 }
 
 // CheckPermission returns true if the user is allowed to access the job.
+// CheckPermission determines if the current user has the required privileges to create
+// a schedule with the given permission level 'p'.
 func (h *HandlerSystemd) CheckPermission(user user.User, p Permission) bool {
 	switch p {
-	case PermissionUserLoggedOn:
-		// user mode requires linger to be enabled
+	case PermissionSystem:
+		// System-level jobs require root privileges to create. This check ensures that
+		// a non-root user cannot create a system-wide service.
+		return user.IsRoot()
+
+	case PermissionUserLoggedOn, PermissionUserBackground:
+		// User-level jobs ("user" or "user_logged_on") do not require root.
+		// However, for them to run reliably when the user is not logged in,
+		// systemd requires that "lingering" be enabled for that user.
+		// This check verifies the linger status and issues a helpful warning if it's not enabled.
+		// It returns 'true' regardless of linger status because creating the job is still allowed.
 		linger, err := isLingerEnabled(user.Username)
-		if err != nil {
-			clog.Warningf("cannot check linger status for user %s: %v", user.Username, err)
-			return false
+		if err == nil && !linger {
+			clog.Warningf("Linger is not enabled for user %q. Scheduled jobs may not run when you are logged out.", user.Username)
+			clog.Warningf("You can enable it with: 'sudo loginctl enable-linger %s'", user.Username)
 		}
-		return linger
+		return true
 
-	default:
-		if user.IsRoot() {
-			return true
-		}
-		// last case is system (or undefined) + no sudo
-		return false
-
+	default: // This case handles PermissionAuto
+		// In "auto" mode, the permission is determined by who is running the command.
+		// A root user will create a system job, and a non-root user will create a user job.
+		// In either scenario, the user is permitted to proceed, so we return true.
+		return true
 	}
 }
 

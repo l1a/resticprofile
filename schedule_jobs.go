@@ -11,7 +11,7 @@ import (
 	"github.com/creativeprojects/resticprofile/util"
 )
 
-func scheduleJobs(handler schedule.Handler, configs []*config.Schedule) error {
+var scheduleJobs = func(handler schedule.Handler, configs []*config.Schedule) error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return err
