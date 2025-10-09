@@ -261,18 +261,18 @@ func (h *HandlerLaunchd) DetectSchedulePermission(permission Permission) (Permis
 }
 
 // CheckPermission returns true if the user is allowed to access the job.
-func (h *HandlerLaunchd) CheckPermission(user user.User, p Permission) bool {
+func (h *HandlerLaunchd) CheckPermission(user user.User, p Permission) (bool, error) {
 	switch p {
 	case PermissionUserLoggedOn, PermissionUserBackground:
 		// user mode is always available
-		return true
+		return true, nil
 
 	default:
 		if user.IsRoot() {
-			return true
+			return true, nil
 		}
 		// last case is system (or undefined) + no sudo
-		return false
+		return false, fmt.Errorf("system jobs require root privileges")
 
 	}
 }

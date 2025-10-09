@@ -36,7 +36,12 @@ func NewJob(handler Handler, config *Config) *Job {
 // Accessible checks if the current user is permitted to access the job
 func (j *Job) Accessible() bool {
 	permission, _ := j.handler.DetectSchedulePermission(PermissionFromConfig(j.config.Permission))
-	return j.handler.CheckPermission(user.Current(), permission)
+	ok, err := j.handler.CheckPermission(user.Current(), permission)
+	if err != nil {
+		clog.Errorf("error checking permission: %v", err)
+		return false
+	}
+	return ok
 }
 
 // Create a new job
@@ -46,8 +51,8 @@ func (j *Job) Create() error {
 	}
 
 	permission := j.getSchedulePermission(PermissionFromConfig(j.config.Permission))
-	if ok := j.handler.CheckPermission(user.Current(), permission); !ok {
-		return permissionError("create")
+	if ok, err := j.handler.CheckPermission(user.Current(), permission); !ok {
+		return err
 	}
 
 	if err := j.handler.DisplaySchedules(j.config.ProfileName, j.config.CommandName, j.config.Schedules); err != nil {
@@ -74,10 +79,9 @@ func (j *Job) Remove() error {
 	} else {
 		permission = j.getSchedulePermission(permission)
 	}
-	if ok := j.handler.CheckPermission(user.Current(), permission); !ok {
-		return permissionError("remove")
+	if ok, err := j.handler.CheckPermission(user.Current(), permission); !ok {
+		return err
 	}
-
 	return j.handler.RemoveJob(j.config, permission)
 }
 
@@ -111,10 +115,4 @@ func (j *Job) getSchedulePermission(permission Permission) Permission {
 		clog.Warningf("you have not specified the permission for your schedule (\"system\", \"user\" or \"user_logged_on\"): assuming %q", permission.String())
 	}
 	return permission
-}
-
-// permissionError display a permission denied message to the user.
-// permissionError is not used in Windows.
-func permissionError(action string) error {
-	return fmt.Errorf("user is not allowed to %s a system job: please restart resticprofile as root (with sudo)", action)
 }

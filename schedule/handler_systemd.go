@@ -342,31 +342,39 @@ func (h *HandlerSystemd) DetectSchedulePermission(p Permission) (Permission, boo
 // CheckPermission returns true if the user is allowed to access the job.
 // CheckPermission determines if the current user has the required privileges to create
 // a schedule with the given permission level 'p'.
-func (h *HandlerSystemd) CheckPermission(user user.User, p Permission) bool {
+func (h *HandlerSystemd) CheckPermission(user user.User, p Permission) (bool, error) {
 	switch p {
 	case PermissionSystem:
 		// System-level jobs require root privileges to create. This check ensures that
 		// a non-root user cannot create a system-wide service.
-		return user.IsRoot()
-
-	case PermissionUserLoggedOn, PermissionUserBackground:
-		// User-level jobs ("user" or "user_logged_on") do not require root.
-		// However, for them to run reliably when the user is not logged in,
-		// systemd requires that "lingering" be enabled for that user.
-		// This check verifies the linger status and issues a helpful warning if it's not enabled.
-		// It returns 'true' regardless of linger status because creating the job is still allowed.
-		linger, err := isLingerEnabled(user.Username)
-		if err == nil && !linger {
-			clog.Warningf("Linger is not enabled for user %q. Scheduled jobs may not run when you are logged out.", user.Username)
-			clog.Warningf("You can enable it with: 'sudo loginctl enable-linger %s'", user.Username)
+		if !user.IsRoot() {
+			return false, fmt.Errorf("system jobs require root privileges")
 		}
-		return true
+		return true, nil
+
+	case PermissionUserBackground:
+		// For user background jobs, enforce that systemd linger is enabled to ensure
+		// the scheduled jobs can run even when the user is not logged in.
+		// Without linger, user services stop when the user logs out.
+		linger, err := isLingerEnabled(user.Username)
+		if err != nil {
+			clog.Warningf("could not check linger status: %v", err)
+			return true, nil
+		}
+		if !linger {
+			return false, fmt.Errorf("linger is not enabled for user %q. Enable it with 'sudo loginctl enable-linger %s' or use 'user_logged_on' permission instead", user.Username, user.Username)
+		}
+		return true, nil
+
+	case PermissionUserLoggedOn:
+		// User logged on jobs do not require linger.
+		return true, nil
 
 	default: // This case handles PermissionAuto
 		// In "auto" mode, the permission is determined by who is running the command.
 		// A root user will create a system job, and a non-root user will create a user job.
 		// In either scenario, the user is permitted to proceed, so we return true.
-		return true
+		return true, nil
 	}
 }
 

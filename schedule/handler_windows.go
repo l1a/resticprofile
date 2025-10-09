@@ -154,8 +154,8 @@ func (h *HandlerWindows) DetectSchedulePermission(permission Permission) (Permis
 
 // CheckPermission returns true if the user is allowed to access the job.
 // This is always true on Windows.
-func (h *HandlerWindows) CheckPermission(_ user.User, _ Permission) bool {
-	return true
+func (h *HandlerWindows) CheckPermission(_ user.User, _ Permission) (bool, error) {
+	return true, nil
 }
 
 // init registers HandlerWindows

@@ -214,8 +214,8 @@ func TestPermissionToSystemd(t *testing.T) {
 			name:         "PermissionUserBackground",
 			permission:   PermissionUserBackground,
 			isRoot:       false,
-			expected:     systemd.SystemUnit,
-			expectedUser: "testuser",
+			expected:     systemd.UserUnit,
+			expectedUser: "",
 		},
 		{
 			name:         "PermissionUserLoggedOn",

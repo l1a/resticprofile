@@ -24,8 +24,8 @@ type Handler interface {
 	// or the best guess considering the current user permission.
 	// safe specifies whether a guess may lead to a too broad or too narrow file access permission.
 	DetectSchedulePermission(permission Permission) (Permission, bool)
-	// CheckPermission returns true if the user is allowed to access the job.
-	CheckPermission(user user.User, p Permission) bool
+	// CheckPermission returns true if the user is allowed to access the job, or an error explaining why not.
+	CheckPermission(user user.User, p Permission) (bool, error)
 }
 
 // FindHandler creates a schedule handler depending on the configuration or nil if the config is not supported

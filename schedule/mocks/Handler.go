@@ -39,7 +39,7 @@ func (_m *Handler) EXPECT() *Handler_Expecter {
 }
 
 // CheckPermission provides a mock function for the type Handler
-func (_mock *Handler) CheckPermission(user1 user.User, p schedule.Permission) bool {
+func (_mock *Handler) CheckPermission(user1 user.User, p schedule.Permission) (bool, error) {
 	ret := _mock.Called(user1, p)
 
 	if len(ret) == 0 {
@@ -47,12 +47,18 @@ func (_mock *Handler) CheckPermission(user1 user.User, p schedule.Permission) bo
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(user.User, schedule.Permission) bool); ok {
-		r0 = returnFunc(user1, p)
-	} else {
-		r0 = ret.Get(0).(bool)
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(user.User, schedule.Permission) (bool, error)); ok {
+		return returnFunc(user1, p)
 	}
-	return r0
+	if rf, ok := ret.Get(0).(bool); ok {
+		r0 = rf
+	}
+	if rf, ok := ret.Get(1).(error); ok {
+		r1 = rf
+	}
+
+	return r0, r1
 }
 
 // Handler_CheckPermission_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckPermission'
@@ -85,12 +91,12 @@ func (_c *Handler_CheckPermission_Call) Run(run func(user1 user.User, p schedule
 	return _c
 }
 
-func (_c *Handler_CheckPermission_Call) Return(b bool) *Handler_CheckPermission_Call {
-	_c.Call.Return(b)
+func (_c *Handler_CheckPermission_Call) Return(b bool, e error) *Handler_CheckPermission_Call {
+	_c.Call.Return(b, e)
 	return _c
 }
 
-func (_c *Handler_CheckPermission_Call) RunAndReturn(run func(user1 user.User, p schedule.Permission) bool) *Handler_CheckPermission_Call {
+func (_c *Handler_CheckPermission_Call) RunAndReturn(run func(user1 user.User, p schedule.Permission) (bool, error)) *Handler_CheckPermission_Call {
 	_c.Call.Return(run)
 	return _c
 }
