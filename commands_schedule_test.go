@@ -11,7 +11,6 @@ import (
 
 	"github.com/creativeprojects/clog"
 	"github.com/creativeprojects/resticprofile/config"
-	"github.com/creativeprojects/resticprofile/crond"
 	"github.com/creativeprojects/resticprofile/term"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -170,17 +169,9 @@ func TestRemoveScheduleIntegrationUsingCrontab(t *testing.T) {
 	term.SetOutput(output)
 	defer term.SetOutput(os.Stdout)
 
-	// this should remove the 2 lines that resemble a resticprofile schedule
+	// this should fail as the profile does not exist
 	err = removeSchedule(output, ctx)
-	require.NoError(t, err)
-
-	result, err := os.ReadFile(crontab)
-	require.NoError(t, err)
-	fmt.Println(string(result))
-
-	// but one line in error should be left in the crontab
-	err = statusSchedule(output, ctx)
-	require.ErrorIs(t, err, crond.ErrEntryNoMatch)
+	assert.ErrorIs(t, err, config.ErrNotFound)
 }
 
 func TestCreateScheduleIntegrationUsingCrontab(t *testing.T) {

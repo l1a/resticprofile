@@ -45,3 +45,11 @@ func (p Permission) String() string {
 		return constants.SchedulePermissionAuto
 	}
 }
+
+// CheckPermission returns true if the permission is granted for the given euid.
+func CheckPermission(permission Permission, euid int) bool {
+	if permission == PermissionSystem {
+		return euid == 0
+	}
+	return true
+}

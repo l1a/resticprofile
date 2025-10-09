@@ -76,43 +76,34 @@ func createSchedule(_ io.Writer, ctx commandContext) error {
 	return nil
 }
 
+// removeSchedule command
 func removeSchedule(_ io.Writer, ctx commandContext) error {
-	var err error
 	c := ctx.config
 	request := ctx.request
 	args := ctx.request.arguments
 
 	if slices.Contains(args, "--legacy") {
 		clog.Warning(legacyFlagWarning)
-		// Unschedule all jobs of all selected profiles
-		for _, profileName := range selectProfilesAndGroups(c, request.profile, args) {
-			schedulerConfig, jobs, err := getRemovableScheduleJobs(c, profileName)
-			if err != nil {
-				return err
-			}
+	}
 
-			err = removeJobs(schedule.NewHandler(schedulerConfig), jobs)
-			if err != nil {
-				err = retryElevated(err, ctx.flags)
-			}
-			if err != nil {
-				// we keep trying to remove the other jobs
-				clog.Error(err)
-			}
+	// Unschedule all jobs of all selected profiles.
+	// We get the list of all jobs that can be removed, even those that are not declared in the configuration file anymore.
+	for _, profileName := range selectProfilesAndGroups(c, request.profile, args) {
+		schedulerConfig, jobs, err := getRemovableScheduleJobs(c, profileName)
+		if err != nil {
+			return err
 		}
-		return nil
+
+		err = removeJobs(schedule.NewHandler(schedulerConfig), jobs)
+		if err != nil {
+			err = retryElevated(err, ctx.flags)
+		}
+		if err != nil {
+			// we keep trying to remove the other jobs
+			clog.Error(err)
+		}
 	}
 
-	profileName := ctx.request.profile
-	if slices.Contains(args, "--all") {
-		// Unschedule all jobs of all profiles
-		profileName = ""
-	}
-	schedulerConfig := schedule.NewSchedulerConfig(ctx.global)
-	err = removeScheduledJobs(schedule.NewHandler(schedulerConfig), ctx.config.GetConfigFile(), profileName)
-	if err != nil {
-		return retryElevated(err, ctx.flags)
-	}
 	return nil
 }
 

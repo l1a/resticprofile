@@ -94,47 +94,6 @@ func removeJobs(handler schedule.Handler, configs []*config.Schedule) error {
 	return nil
 }
 
-func removeScheduledJobs(handler schedule.Handler, configFile, profileName string) error {
-	err := handler.Init()
-	if err != nil {
-		return err
-	}
-	defer handler.Close()
-
-	clog.Debugf("looking up schedules from configuration file %s", configFile)
-	configs, err := handler.Scheduled(profileName)
-	hasNoEntries := len(configs) == 0
-	if err != nil {
-		if hasNoEntries {
-			return err
-		}
-		clog.Errorf("some configurations failed to load:\n%v", err)
-	}
-	if hasNoEntries {
-		clog.Info("no scheduled jobs found")
-		return nil
-	}
-
-	var errs error
-	for _, cfg := range configs {
-		if cfg.ConfigFile != configFile {
-			clog.Debugf("skipping job %s/%s from configuration file %s", cfg.ProfileName, cfg.CommandName, cfg.ConfigFile)
-			continue
-		}
-		job := schedule.NewJob(handler, &cfg)
-		err = job.Remove()
-		if err != nil {
-			errs = errors.Join(errs, fmt.Errorf("%s/%s: %w", cfg.ProfileName, cfg.CommandName, err))
-			continue
-		}
-		clog.Infof("scheduled job %s/%s removed", cfg.ProfileName, cfg.CommandName)
-	}
-	if errs != nil {
-		return fmt.Errorf("failed to remove some jobs: %w", errs)
-	}
-	return nil
-}
-
 func statusJobs(handler schedule.Handler, profileName string, configs []*config.Schedule) error {
 	err := handler.Init()
 	if err != nil {

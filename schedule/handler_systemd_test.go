@@ -86,15 +86,14 @@ func TestReadingSystemdScheduled(t *testing.T) {
 
 	handler := NewHandler(SchedulerSystemd{}).(*HandlerSystemd)
 
+	// Get the number of scheduled jobs before we start
+	beforeScheduled, err := handler.Scheduled("")
+	require.NoError(t, err)
+
 	expectedJobs := []Config{}
 	for _, testCase := range testCases {
 		job := testCase.job
 		err := handler.CreateJob(&job, testCase.schedules, PermissionFromConfig(schedulePermission))
-
-		toRemove := &job
-		t.Cleanup(func() {
-			_ = handler.RemoveJob(toRemove, PermissionFromConfig(schedulePermission))
-		})
 		require.NoError(t, err)
 
 		job.Environment = []string{"HOME=" + userHome}
@@ -125,7 +124,7 @@ func TestReadingSystemdScheduled(t *testing.T) {
 
 	scheduled, err = handler.Scheduled("")
 	require.NoError(t, err)
-	assert.Empty(t, scheduled)
+	assert.Len(t, scheduled, len(beforeScheduled))
 }
 
 func TestDetectPermissionSystemd(t *testing.T) {
@@ -285,69 +284,6 @@ func TestCloseHandlerRunsDaemonReload(t *testing.T) {
 
 	handler.addReloadHook(systemd.UserUnit)
 	handler.Close()
-}
-
-func TestCheckPermission(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name       string
-		permission Permission
-		euid       int
-		expected   bool
-	}{
-		{
-			name:       "PermissionUserLoggedOn",
-			permission: PermissionUserLoggedOn,
-			euid:       1000,  // non-root user
-			expected:   false, // since linger is likely not enabled in test
-		},
-		{
-			name:       "PermissionUserBackground",
-			permission: PermissionUserBackground,
-			euid:       1000,  // non-root user
-			expected:   false, // not root
-		},
-		{
-			name:       "PermissionSystem as root",
-			permission: PermissionSystem,
-			euid:       0, // root user
-			expected:   true,
-		},
-		{
-			name:       "PermissionSystem as non-root",
-			permission: PermissionSystem,
-			euid:       1000, // non-root user
-			expected:   false,
-		},
-		{
-			name:       "Undefined permission as root",
-			permission: PermissionFromConfig("undefined"),
-			euid:       0, // root user
-			expected:   true,
-		},
-		{
-			name:       "Undefined permission as non-root",
-			permission: PermissionFromConfig("undefined"),
-			euid:       1000, // non-root user
-			expected:   false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			user := user.User{
-				Uid:      tc.euid,
-				Username: "testuser",
-			}
-
-			handler := NewHandler(SchedulerSystemd{}).(*HandlerSystemd)
-			result := handler.CheckPermission(user, tc.permission)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
 }
 
 func TestIsLingerEnabled(t *testing.T) {
