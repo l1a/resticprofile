@@ -211,7 +211,7 @@ func (h *HandlerSystemd) RemoveJob(job *Config, permission Permission) error {
 	serviceFile := systemd.GetServiceFile(job.ProfileName, job.CommandName)
 	timerFile := systemd.GetTimerFile(job.ProfileName, job.CommandName)
 
-	err = h.disableJob(job, unitType, timerFile)
+	err := h.disableJob(job, unitType, timerFile)
 	if err != nil {
 		return err
 	}
