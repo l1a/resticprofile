@@ -143,6 +143,7 @@ func (u Unit) Generate(config Config) error {
 
 	if config.UnitType == SystemUnit && config.User == "" {
 		// permission = system
+		// Avoid duplicating HOME if it's already set (e.g., from environment capture in schedule)
 		if !slices.ContainsFunc(environment, func(e string) bool { return strings.HasPrefix(e, "HOME=") }) {
 			environment = append(environment, fmt.Sprintf("HOME=%s", u.user.SudoHomeDir))
 		}
@@ -151,6 +152,7 @@ func (u Unit) Generate(config Config) error {
 		}
 	} else if u.user.UserHomeDir != "" {
 		// permission = user or user_logged_on
+		// Avoid duplicating HOME if it's already set (e.g., from environment capture in schedule)
 		if !slices.ContainsFunc(environment, func(e string) bool { return strings.HasPrefix(e, "HOME=") }) {
 			environment = append(environment, fmt.Sprintf("HOME=%s", u.user.UserHomeDir))
 		}
