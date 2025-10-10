@@ -143,13 +143,17 @@ func (u Unit) Generate(config Config) error {
 
 	if config.UnitType == SystemUnit && config.User == "" {
 		// permission = system
-		environment = append(environment, fmt.Sprintf("HOME=%s", u.user.SudoHomeDir))
+		if !slices.ContainsFunc(environment, func(e string) bool { return strings.HasPrefix(e, "HOME=") }) {
+			environment = append(environment, fmt.Sprintf("HOME=%s", u.user.SudoHomeDir))
+		}
 		if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
 			environment = append(environment, fmt.Sprintf("SUDO_USER=%s", sudoUser))
 		}
 	} else if u.user.UserHomeDir != "" {
 		// permission = user or user_logged_on
-		environment = append(environment, fmt.Sprintf("HOME=%s", u.user.UserHomeDir))
+		if !slices.ContainsFunc(environment, func(e string) bool { return strings.HasPrefix(e, "HOME=") }) {
+			environment = append(environment, fmt.Sprintf("HOME=%s", u.user.UserHomeDir))
+		}
 	}
 
 	policy := ""
