@@ -239,7 +239,7 @@ func (h *HandlerSystemd) disableJob(job *Config, unitType systemd.UnitType, time
 	err := runSystemctlOnUnit(timerFile, systemctlDisable, unitType, true, flagNow, flagQuiet)
 	clog.Debugf("systemctl disable returned: %v", err)
 	if err != nil {
-		return err
+		clog.Debugf("ignoring disable error: %v", err)
 	}
 
 	return nil
