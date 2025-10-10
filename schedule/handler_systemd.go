@@ -209,14 +209,6 @@ func (h *HandlerSystemd) RemoveJob(job *Config, permission Permission) error {
 	u := user.Current()
 	unitType, _ := permissionToSystemd(u, permission)
 	serviceFile := systemd.GetServiceFile(job.ProfileName, job.CommandName)
-	unitLoaded, err := unitLoaded(serviceFile, unitType)
-	if err != nil {
-		return err
-	}
-	if !unitLoaded {
-		return ErrScheduledJobNotFound
-	}
-
 	timerFile := systemd.GetTimerFile(job.ProfileName, job.CommandName)
 
 	err = h.disableJob(job, unitType, timerFile)
