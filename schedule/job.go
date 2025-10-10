@@ -79,9 +79,6 @@ func (j *Job) Remove() error {
 	} else {
 		permission = j.getSchedulePermission(permission)
 	}
-	if ok, err := j.handler.CheckPermission(user.Current(), permission); !ok {
-		return err
-	}
 	return j.handler.RemoveJob(j.config, permission)
 }
 
