@@ -228,7 +228,7 @@ func (h *HandlerSystemd) RemoveJob(job *Config, permission Permission) error {
 
 func (h *HandlerSystemd) disableJob(job *Config, unitType systemd.UnitType, timerFile string) error {
 	// stop the job with the --now flag then disable the job
-	err := runSystemctlOnUnit(timerFile, systemctlDisable, unitType, job.removeOnly, flagNow, flagQuiet)
+	err := runSystemctlOnUnit(timerFile, systemctlDisable, unitType, true, flagNow, flagQuiet)
 	if err != nil {
 		return err
 	}
