@@ -206,29 +206,38 @@ func (h *HandlerSystemd) CreateJob(job *Config, schedules []*calendar.Event, per
 
 // RemoveJob is disabling the systemd unit and deleting the timer and service files
 func (h *HandlerSystemd) RemoveJob(job *Config, permission Permission) error {
+	clog.Infof("Starting removal of systemd job %s/%s with permission %v", job.ProfileName, job.CommandName, permission)
 	u := user.Current()
 	unitType, _ := permissionToSystemd(u, permission)
+	clog.Debugf("Unit type: %v", unitType)
 	serviceFile := systemd.GetServiceFile(job.ProfileName, job.CommandName)
 	timerFile := systemd.GetTimerFile(job.ProfileName, job.CommandName)
 
+	clog.Debugf("Disabling timer %s", timerFile)
 	err := h.disableJob(job, unitType, timerFile)
 	if err != nil {
+		clog.Errorf("disableJob failed: %v", err)
 		return err
 	}
 
+	clog.Debugf("Removing job files for %s", serviceFile)
 	err = h.removeJobFiles(job, unitType, timerFile, serviceFile)
 	if err != nil {
+		clog.Errorf("removeJobFiles failed: %v", err)
 		return err
 	}
 
 	h.addReloadHook(unitType)
+	clog.Infof("Completed removal of job %s/%s", job.ProfileName, job.CommandName)
 
 	return nil
 }
 
 func (h *HandlerSystemd) disableJob(job *Config, unitType systemd.UnitType, timerFile string) error {
 	// stop the job with the --now flag then disable the job
+	clog.Debugf("Running systemctl disable --now --quiet %s for unitType %v", timerFile, unitType)
 	err := runSystemctlOnUnit(timerFile, systemctlDisable, unitType, true, flagNow, flagQuiet)
+	clog.Debugf("systemctl disable returned: %v", err)
 	if err != nil {
 		return err
 	}
