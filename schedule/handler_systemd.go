@@ -213,8 +213,17 @@ func (h *HandlerSystemd) RemoveJob(job *Config, permission Permission) error {
 	serviceFile := systemd.GetServiceFile(job.ProfileName, job.CommandName)
 	timerFile := systemd.GetTimerFile(job.ProfileName, job.CommandName)
 
+	// Check if the systemd unit exists before attempting removal to avoid unnecessary operations and logging for non-existent jobs
+	err := runSystemctlOnUnit(timerFile, systemctlStatus, unitType, true)
+	if errors.Is(err, ErrScheduledJobNotFound) {
+		return ErrScheduledJobNotFound
+	}
+	if err != nil {
+		return err
+	}
+
 	clog.Debugf("Disabling timer %s", timerFile)
-	err := h.disableJob(job, unitType, timerFile)
+	err = h.disableJob(job, unitType, timerFile)
 	if err != nil {
 		clog.Errorf("disableJob failed: %v", err)
 		return err

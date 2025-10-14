@@ -1,6 +1,6 @@
-# 
+#
 # Makefile for resticprofile
-# 
+#
 GOCMD=go
 GOBUILD=$(GOCMD) build
 GOINSTALL=$(GOCMD) install
@@ -133,7 +133,8 @@ install: prepare_build ## Install the binary (to $GOBIN)
 
 build: prepare_build ## Build the binary
 	@echo "[*] $@"
-	GOPATH="$(GOPATH)" \
+	# Suppress C compiler warnings from go-m1cpu about variable-length arrays (GCC extension not supported by clang)
+	CGO_CFLAGS="-Wno-gnu-folding-constant" GOPATH="$(GOPATH)" \
 	$(GOBUILD) -o $(BINARY) -v -ldflags "-X 'main.commit=${BUILD_COMMIT}' -X 'main.date=${BUILD_DATE}' -X 'main.builtBy=make'"
 
 build-no-selfupdate: prepare_build ## Build the binary without self-update feature

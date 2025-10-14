@@ -51,13 +51,16 @@ func (_mock *Handler) CheckPermission(user1 user.User, p schedule.Permission) (b
 	if returnFunc, ok := ret.Get(0).(func(user.User, schedule.Permission) (bool, error)); ok {
 		return returnFunc(user1, p)
 	}
-	if rf, ok := ret.Get(0).(bool); ok {
-		r0 = rf
+	if returnFunc, ok := ret.Get(0).(func(user.User, schedule.Permission) bool); ok {
+		r0 = returnFunc(user1, p)
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
-	if rf, ok := ret.Get(1).(error); ok {
-		r1 = rf
+	if returnFunc, ok := ret.Get(1).(func(user.User, schedule.Permission) error); ok {
+		r1 = returnFunc(user1, p)
+	} else {
+		r1 = ret.Error(1)
 	}
-
 	return r0, r1
 }
 
@@ -91,8 +94,8 @@ func (_c *Handler_CheckPermission_Call) Run(run func(user1 user.User, p schedule
 	return _c
 }
 
-func (_c *Handler_CheckPermission_Call) Return(b bool, e error) *Handler_CheckPermission_Call {
-	_c.Call.Return(b, e)
+func (_c *Handler_CheckPermission_Call) Return(b bool, err error) *Handler_CheckPermission_Call {
+	_c.Call.Return(b, err)
 	return _c
 }
 
