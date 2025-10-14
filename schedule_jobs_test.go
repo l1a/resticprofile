@@ -94,7 +94,7 @@ func TestRemoveJob(t *testing.T) {
 	handler.EXPECT().Init().Return(nil)
 	handler.EXPECT().Close()
 	handler.EXPECT().DetectSchedulePermission(schedule.PermissionAuto).Return(schedule.PermissionUserBackground, true)
-	handler.EXPECT().CheckPermission(mock.Anything, schedule.PermissionUserBackground).Return(true, nil)
+	// CheckPermission not expected for non-RemoveOnly jobs as it's not called in job.Remove()
 	handler.EXPECT().RemoveJob(mock.AnythingOfType("*schedule.Config"), schedule.PermissionUserBackground).
 		RunAndReturn(func(scheduleConfig *schedule.Config, _ schedule.Permission) error {
 			assert.Equal(t, "profile", scheduleConfig.ProfileName)
@@ -134,7 +134,7 @@ func TestFailRemoveJob(t *testing.T) {
 	handler.EXPECT().Init().Return(nil)
 	handler.EXPECT().Close()
 	handler.EXPECT().DetectSchedulePermission(schedule.PermissionAuto).Return(schedule.PermissionUserBackground, true)
-	handler.EXPECT().CheckPermission(mock.Anything, schedule.PermissionUserBackground).Return(true, nil)
+	// CheckPermission not expected for non-RemoveOnly jobs as it's not called in job.Remove()
 	handler.EXPECT().RemoveJob(mock.AnythingOfType("*schedule.Config"), schedule.PermissionUserBackground).
 		Return(errors.New("error removing job"))
 
@@ -150,7 +150,7 @@ func TestNoFailRemoveUnknownJob(t *testing.T) {
 	handler.EXPECT().Init().Return(nil)
 	handler.EXPECT().Close()
 	handler.EXPECT().DetectSchedulePermission(schedule.PermissionAuto).Return(schedule.PermissionUserBackground, true)
-	handler.EXPECT().CheckPermission(mock.Anything, schedule.PermissionUserBackground).Return(true, nil)
+	// CheckPermission not expected for non-RemoveOnly jobs as it's not called in job.Remove()
 	handler.EXPECT().RemoveJob(mock.AnythingOfType("*schedule.Config"), schedule.PermissionUserBackground).
 		Return(schedule.ErrScheduledJobNotFound)
 

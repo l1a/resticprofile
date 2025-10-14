@@ -206,7 +206,6 @@ func (h *HandlerSystemd) CreateJob(job *Config, schedules []*calendar.Event, per
 
 // RemoveJob is disabling the systemd unit and deleting the timer and service files
 func (h *HandlerSystemd) RemoveJob(job *Config, permission Permission) error {
-	clog.Infof("Starting removal of systemd job %s/%s with permission %v", job.ProfileName, job.CommandName, permission)
 	u := user.Current()
 	unitType, _ := permissionToSystemd(u, permission)
 	clog.Debugf("Unit type: %v", unitType)
@@ -221,6 +220,9 @@ func (h *HandlerSystemd) RemoveJob(job *Config, permission Permission) error {
 	if err != nil {
 		return err
 	}
+
+	// Log starting removal only after confirming the job exists
+	clog.Infof("Starting removal of systemd job %s/%s with permission %v", job.ProfileName, job.CommandName, permission)
 
 	clog.Debugf("Disabling timer %s", timerFile)
 	err = h.disableJob(job, unitType, timerFile)
@@ -454,7 +456,8 @@ func getSystemdStatus(profile string, unitType systemd.UnitType) (string, error)
 }
 
 func runSystemctlOnUnit(timerName, command string, unitType systemd.UnitType, silent bool, extraArgs ...string) error {
-	if command == systemctlStatus {
+	// Suppress status header when in silent mode (e.g., during existence checks) to avoid printing for non-existent jobs
+	if command == systemctlStatus && !silent {
 		fmt.Print("Systemd timer status\n=====================\n")
 	}
 	args := make([]string, 0, 3)

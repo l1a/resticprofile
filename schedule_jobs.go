@@ -77,10 +77,7 @@ func removeJobs(handler schedule.Handler, configs []*config.Schedule) error {
 		err := job.Remove()
 		if err != nil {
 			if errors.Is(err, schedule.ErrScheduledJobNotFound) {
-				// Display a warning and keep going. Skip message for RemoveOnly jobs since they may not exist
-				if !job.RemoveOnly() {
-					clog.Warningf("scheduled job %s/%s not found", scheduleConfig.ProfileName, scheduleConfig.CommandName)
-				}
+				// Skip silently if the job is not found, to only print status when a scheduled service or timer was found
 				continue
 			}
 			return fmt.Errorf("error removing job %s/%s: %w",

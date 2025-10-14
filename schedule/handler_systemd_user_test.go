@@ -32,9 +32,7 @@ func TestCreateSystemdUserJob(t *testing.T) {
 		Arguments:   NewCommandArguments([]string{"backup"}),
 		// This is the key setting that tells the handler to create a user-level service.
 		Permission: constants.SchedulePermissionUserLoggedOn,
-		// Add a flag to prevent the job from starting immediately, which is cleaner for testing.
-		Flags:     map[string]string{"no-start": ""},
-		Schedules: []string{event.String()},
+		Schedules:  []string{event.String()},
 	}
 	schedules := []*calendar.Event{event}
 	permission := PermissionFromConfig(job.Permission)
