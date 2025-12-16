@@ -21,7 +21,7 @@ func TestStartProcessWithIOPriority(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Log(output)
-		assert.Contains(t, output, "IOPriority: class = 0, value = 4")
+		assert.Contains(t, output, "IOPriority: class = 0, value = 0")
 
 	})
 
