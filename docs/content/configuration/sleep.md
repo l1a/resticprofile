@@ -8,7 +8,7 @@ This feature is available for:
 - Windows
 - Linux with systemd ([logind](https://www.freedesktop.org/software/systemd/man/systemd-logind.service.html))
 
-There's a `global` parameter called `prevent-sleep` that you can set to `true`, and resticprofile will prevent your system from idle sleeping.
+There's a `global` parameter called `prevent-sleep` that you can set to `true`, and resticprofile will prevent your system from idle sleeping while running commands.
 
 Please note:
 - it will not prevent a sleep if the system is running on batteries
