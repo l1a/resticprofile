@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/creativeprojects/clog"
 	"github.com/creativeprojects/resticprofile/config"
@@ -12,7 +13,7 @@ import (
 )
 
 var scheduleJobs = func(handler schedule.Handler, configs []*config.Schedule) error {
-	wd, err := os.Getwd()
+	currentDir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
@@ -30,12 +31,26 @@ var scheduleJobs = func(handler schedule.Handler, configs []*config.Schedule) er
 	for _, cfg := range configs {
 		scheduleConfig := scheduleToConfig(cfg)
 		scheduleName := scheduleConfig.CommandName + "@" + scheduleConfig.ProfileName
+
+		if scheduleConfig.ConfigFile != "" {
+			absConfig := scheduleConfig.ConfigFile
+			if !filepath.IsAbs(absConfig) {
+				absConfig = filepath.Join(currentDir, absConfig)
+			}
+			scheduleConfig.ConfigFile = filepath.Clean(absConfig)
+		}
+
 		args := []string{
 			"--no-ansi",
 			"--config",
 			scheduleConfig.ConfigFile,
 			"run-schedule",
 			scheduleName,
+		}
+
+		wd := currentDir
+		if scheduleConfig.ConfigFile != "" {
+			wd = filepath.Dir(scheduleConfig.ConfigFile)
 		}
 
 		scheduleConfig.SetCommand(wd, binary, args)
