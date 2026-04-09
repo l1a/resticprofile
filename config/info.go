@@ -418,7 +418,7 @@ func configurePropertyFromType(p *basicPropertyInfo, valueType reflect.Type) {
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		p.resetTypeInfo().mayNumber = true
 		p.mustInt = true
-		if valueType == reflect.TypeOf(time.Duration(0)) {
+		if valueType == reflect.TypeFor[time.Duration]() {
 			p.format = "duration"
 			p.mayString = true
 		}
@@ -600,13 +600,13 @@ func init() {
 	// Init infoTypes
 	{
 		profile := *NewProfile(nil, "")
-		infoTypes.global = reflect.TypeOf(Global{})
-		infoTypes.group = reflect.TypeOf(Group{})
-		infoTypes.mixins = reflect.TypeOf(mixin{})
-		infoTypes.mixinUse = reflect.TypeOf(mixinUse{})
-		infoTypes.profile = reflect.TypeOf(profile)
-		infoTypes.scheduleConfig = reflect.TypeOf(ScheduleConfig{})
-		infoTypes.genericSection = reflect.TypeOf(GenericSection{})
+		infoTypes.global = reflect.TypeFor[Global]()
+		infoTypes.group = reflect.TypeFor[Group]()
+		infoTypes.mixins = reflect.TypeFor[mixin]()
+		infoTypes.mixinUse = reflect.TypeFor[mixinUse]()
+		infoTypes.profile = reflect.TypeFor[Profile]()
+		infoTypes.scheduleConfig = reflect.TypeFor[ScheduleConfig]()
+		infoTypes.genericSection = reflect.TypeFor[GenericSection]()
 		infoTypes.genericSectionNames = slices.Collect(maps.Keys(profile.OtherSections))
 	}
 }
@@ -672,11 +672,10 @@ func NewProfileInfoForRestic(resticVersion string, withDefaultOptions bool) Prof
 	// Building initial set including generic sections (from data model)
 	profileSet := propertySetFromType(infoTypes.profile)
 	{
-		genericSection := propertySetFromType(infoTypes.genericSection)
 		for _, name := range infoTypes.genericSectionNames {
 			pi := new(propertyInfo)
 			pi.nested = &namedPropertySet{
-				propertySet: genericSection,
+				propertySet: propertySetFromType(infoTypes.genericSection),
 				name:        name,
 			}
 			profileSet.properties[name] = pi

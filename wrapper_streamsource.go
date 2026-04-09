@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/creativeprojects/clog"
-	"github.com/creativeprojects/resticprofile/term"
 )
 
 func (r *resticWrapper) prepareStreamSource() (io.ReadCloser, error) {
@@ -76,7 +76,7 @@ func (r *resticWrapper) prepareCommandStreamSource() (io.ReadCloser, error) {
 			clog.Debugf("starting 'stdin-command' command %d/%d: %s", i+1, len(r.profile.Backup.StdinCommand), sourceCommand)
 			rCommand := newShellCommand(sourceCommand, nil, env, r.getShell(), r.dryRun, commandSignals, nil)
 			rCommand.stdout = bufferedWriter
-			rCommand.stderr = term.GetErrorOutput()
+			rCommand.stderr = r.ctx.terminal.Stderr()
 
 			_, stderr, err := runShellCommand(rCommand)
 			if err != nil {
@@ -105,7 +105,7 @@ func (r *resticWrapper) prepareCommandStreamSource() (io.ReadCloser, error) {
 	var initialReader io.Reader
 	{
 		initialBytes := make([]byte, 512)
-		if n, err := pipeReader.Read(initialBytes); err == nil || err == io.EOF {
+		if n, err := pipeReader.Read(initialBytes); err == nil || errors.Is(err, io.EOF) {
 			clog.Debugf("initial %d bytes successfully read from 'stdin-command'", n)
 			initialReader = bytes.NewReader(initialBytes[:n])
 		} else {

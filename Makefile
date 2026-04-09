@@ -1,7 +1,8 @@
 #
 # Makefile for resticprofile
 #
-GOCMD=go
+#
+GOCMD=$(shell command -v go)
 GOBUILD=$(GOCMD) build
 GOINSTALL=$(GOCMD) install
 GORUN=$(GOCMD) run
@@ -28,6 +29,8 @@ README=README.md
 
 TESTS=./...
 COVERAGE_FILE=coverage.out
+COVERAGE_SSH_FILE=coverage-ssh.out
+JUNIT_FILE=unit-tests.xml
 
 BUILD=build/
 
@@ -54,6 +57,9 @@ ifeq ($(UNAME),Darwin)
 	TMP_MOUNT=${TMP_MOUNT_DARWIN}
 endif
 
+TMPDIR ?= /tmp
+SSH_TESTS_TMPDIR=$(shell echo "$(TMPDIR)/resticprofile-ssh-tests" | tr -s /)
+
 TOC_START=<\!--ts-->
 TOC_END=<\!--te-->
 TOC_PATH=toc.md
@@ -75,7 +81,7 @@ all: prepare_test test build
 .PHONY: all verify prepare_test prepare_build install clean ramdisk rest-server nightly toc syslog checkdoc
 
 verify: ## Verify go installation
-ifeq ($(wildcard $(GOPATH)/.),)
+ifeq ($(GOPATH),)
 	@echo "GOPATH not found, please check your go installation"
 	exit 1
 endif
@@ -94,11 +100,11 @@ $(GOBIN)/github-markdown-toc.go: verify $(GOBIN)/eget
 
 $(GOBIN)/mockery: verify $(GOBIN)/eget
 	@echo "[*] $@"
-	"$(GOBIN)/eget" vektra/mockery --tag v3.5.5 --upgrade-only --to '$(GOBIN)'
+	"$(GOBIN)/eget" vektra/mockery --tag v3.7.0 --upgrade-only --to '$(GOBIN)'
 
-$(GOBIN)/golangci-lint: verify $(GOBIN)/eget
+$(GOBIN)/golangci-lint-v2: verify $(GOBIN)/eget
 	@echo "[*] $@"
-	"$(GOBIN)/eget" golangci/golangci-lint --tag v2.5.0 --asset=tar.gz --upgrade-only --to '$(GOBIN)'
+	"$(GOBIN)/eget" golangci/golangci-lint --tag v2.11.4 --asset=tar.gz --upgrade-only --to '$(GOBIN)/golangci-lint-v2'
 
 $(GOBIN)/hugo: $(GOBIN)/eget
 	@echo "[*] $@"
@@ -107,6 +113,10 @@ $(GOBIN)/hugo: $(GOBIN)/eget
 $(GOBIN)/muffet: verify $(GOBIN)/eget
 	@echo "[*] $@"
 	"$(GOBIN)/eget" raviqqe/muffet --upgrade-only --to '$(GOBIN)'
+
+$(GOBIN)/gotestsum: verify $(GOBIN)/eget
+	@echo "[*] $@"
+	"$(GOBIN)/eget" gotestyourself/gotestsum --upgrade-only --to '$(GOBIN)'
 
 prepare_build: verify download
 	@echo "[*] $@"
@@ -170,13 +180,13 @@ build-windows: prepare_build ## Build the binary for Windows
 
 build-all: build-mac build-linux build-pi build-windows ## Build the binary for all platforms
 
-test: prepare_test ## Run unit tests
+test: $(GOBIN)/gotestsum prepare_test ## Run unit tests
 	@echo "[*] $@"
-	$(GOTEST) $(TESTS)
+	$(GOBIN)/gotestsum $(TESTS)
 
-test-ci: prepare_test ## Run unit tests with coverage (for CI)
+test-ci: $(GOBIN)/gotestsum prepare_test ## Run unit tests with coverage (for CI)
 	@echo "[*] $@"
-	$(GOTEST) -v -race -short -coverprofile='coverage.out' ./...
+	$(GOBIN)/gotestsum --junitfile $(JUNIT_FILE) -- -race -short -tags=fuse -coverprofile='$(COVERAGE_FILE)' ./...
 
 coverage: ## Generate coverage report
 	@echo "[*] $@"
@@ -186,19 +196,22 @@ coverage: ## Generate coverage report
 clean: ## Clean up the build artifacts
 	@echo "[*] $@"
 	$(GOCLEAN)
-	rm -rf $(BINARY) \
-	       $(BINARY_DARWIN_AMD64) \
-	       $(BINARY_DARWIN_ARM64) \
-	       $(BINARY_LINUX_AMD64) \
-	       $(BINARY_LINUX_ARM64) \
-	       $(BINARY_PI) \
-	       $(BINARY_WINDOWS_AMD64) \
-	       $(BINARY_WINDOWS_ARM64) \
-	       $(COVERAGE_FILE) \
-	       restic_*_linux_amd64* \
-	       ${BUILD}restic* \
-	       ${BUILD}rclone* \
-	       dist/*
+	rm -rf \
+		$(BINARY) \
+		$(BINARY_DARWIN_AMD64) \
+		$(BINARY_DARWIN_ARM64) \
+		$(BINARY_LINUX_AMD64) \
+		$(BINARY_LINUX_ARM64) \
+		$(BINARY_PI) \
+		$(BINARY_WINDOWS_AMD64) \
+		$(BINARY_WINDOWS_ARM64) \
+		$(COVERAGE_FILE) \
+		$(COVERAGE_SSH_FILE) \
+		$(JUNIT_FILE) \
+		restic_*_linux_amd64* \
+		${BUILD}restic* \
+		${BUILD}rclone* \
+		dist/*
 	find . -path "*/mocks/*" -exec rm {} \;
 	restic cache --cleanup
 
@@ -317,25 +330,25 @@ checkdoc: ## Check documentation
 checklinks: $(GOBIN)/muffet ## Check for broken links in the documentation site
 	@echo "[*] $@"
 	muffet --buffer-size=8192 --max-connections-per-host=8 --rate-limit=20 \
-	  --exclude="(linux\.die\.net|scoop\.sh|commit)" \
+	  --exclude="(linux\.die\.net|scoop\.sh|stackoverflow\.com|commit)" \
 	  --header="User-Agent: Muffet/$$(muffet --version)" \
 	  http://127.0.0.1:1313/resticprofile/
 
 .PHONY: lint
-lint: $(GOBIN)/golangci-lint ## Run golangci-lint
+lint: $(GOBIN)/golangci-lint-v2 ## Run golangci-lint
 	@echo "[*] $@"
-	GOOS=darwin golangci-lint run
-	GOOS=linux golangci-lint run
-	GOOS=windows golangci-lint run
+	GOOS=darwin $(GOBIN)/golangci-lint-v2 run
+	GOOS=linux $(GOBIN)/golangci-lint-v2 run
+	GOOS=windows $(GOBIN)/golangci-lint-v2 run
 
 .PHONY: fix
-fix: $(GOBIN)/golangci-lint ## Run golangci-lint with --fix
+fix: $(GOBIN)/golangci-lint-v2 ## Run golangci-lint with --fix
 	@echo "[*] $@"
 	$(GOCMD) mod tidy
 	$(GOCMD) fix ./...
-	GOOS=darwin golangci-lint run --fix
-	GOOS=linux golangci-lint run --fix
-	GOOS=windows golangci-lint run --fix
+	GOOS=darwin $(GOBIN)/golangci-lint-v2 run --fix
+	GOOS=linux $(GOBIN)/golangci-lint-v2 run --fix
+	GOOS=windows $(GOBIN)/golangci-lint-v2 run --fix
 
 .PHONY: deploy-current
 deploy-current: build-linux build-pi
@@ -350,3 +363,27 @@ deploy-current: build-linux build-pi
 		rsync -avz --progress $(BINARY_PI) $$server: ; \
 		ssh -t $$server "sudo -S install $(BINARY_PI) /usr/local/bin/resticprofile" ; \
 	done
+
+.PHONY: start-ssh-server
+start-ssh-server: ## Start the SSH server for testing
+	@echo "[*] $@"
+	@mkdir -p $(SSH_TESTS_TMPDIR) && rm -f $(SSH_TESTS_TMPDIR)/id_* || echo "Failed to create temporary directory"
+	@ssh-keygen -t rsa -b 2048 -f $(SSH_TESTS_TMPDIR)/id_rsa -N "" -C "resticprofile@$(shell hostname)"
+	@ssh-keygen -t ecdsa -b 521 -f $(SSH_TESTS_TMPDIR)/id_ecdsa -N "" -C "resticprofile@$(shell hostname)"
+	@ssh-keygen -t ed25519 -f $(SSH_TESTS_TMPDIR)/id_ed25519 -N "" -C "resticprofile@$(shell hostname)"
+	@cd ./ssh/test && \
+		USER_ID=$(shell id -u) GROUP_ID=$(shell id -g) SSH_TESTS_TMPDIR=$(SSH_TESTS_TMPDIR) \
+		docker compose up -d --force-recreate
+	@sleep 1
+	@ssh-keyscan -p 2222 -H localhost > $(SSH_TESTS_TMPDIR)/known_hosts
+
+.PHONY: stop-ssh-server
+stop-ssh-server: ## Stop the SSH server and clean up temporary files
+	@echo "[*] $@"
+	cd ./ssh/test && SSH_TESTS_TMPDIR=$(SSH_TESTS_TMPDIR) docker compose down --remove-orphans
+	@test -d "$(SSH_TESTS_TMPDIR)" && rm -rf "$(SSH_TESTS_TMPDIR)" || echo "temporary directory not found, nothing to remove"
+
+.PHONY: ssh-test
+ssh-test: ## Run SSH client tests
+	@echo "[*] $@"
+	@go test -run TestSSHClient -v -race -tags ssh -coverprofile='$(COVERAGE_SSH_FILE)' ./ssh

@@ -22,7 +22,6 @@ import (
 	"github.com/creativeprojects/resticprofile/monitor/hook"
 	"github.com/creativeprojects/resticprofile/restic"
 	"github.com/creativeprojects/resticprofile/shell"
-	"github.com/creativeprojects/resticprofile/term"
 	"github.com/creativeprojects/resticprofile/util"
 	"github.com/creativeprojects/resticprofile/util/collect"
 )
@@ -405,10 +404,7 @@ func (r *resticWrapper) prepareCommand(command string, args *shell.Args, allowEx
 	// Add retry-lock (supported from restic 0.16, depends on filter being enabled)
 	if lockRetryTime, enabled := r.remainingLockRetryTime(); enabled && filter != nil {
 		// limiting the retry handling in restic, we need to make sure we can retry internally so that unlock is called.
-		lockRetryTime = lockRetryTime - r.global.ResticLockRetryAfter - constants.MinResticLockRetryDelay
-		if lockRetryTime > constants.MaxResticLockRetryTimeArgument {
-			lockRetryTime = constants.MaxResticLockRetryTimeArgument
-		}
+		lockRetryTime = min(lockRetryTime-r.global.ResticLockRetryAfter-constants.MinResticLockRetryDelay, constants.MaxResticLockRetryTimeArgument)
 		lockRetryTime = lockRetryTime.Truncate(time.Minute)
 
 		if lockRetryTime > 0 && !r.containsArguments(args.GetAll(), fmt.Sprintf("--%s", constants.ParameterRetryLock)) {
@@ -441,8 +437,8 @@ func (r *resticWrapper) prepareCommand(command string, args *shell.Args, allowEx
 	rCommand := newShellCommand(binary, arguments, env, r.getShell(), r.dryRun, r.sigChan, r.setPID)
 	rCommand.publicArgs = publicArguments
 	// stdout are stderr are coming from the default terminal (in case they're redirected)
-	rCommand.stdout = term.GetOutput()
-	rCommand.stderr = term.GetErrorOutput()
+	rCommand.stdout = r.ctx.terminal.Stdout()
+	rCommand.stderr = r.ctx.terminal.Stderr()
 	rCommand.streamError = r.profile.StreamError
 	rCommand.dir = dir
 
@@ -548,7 +544,7 @@ func (r *resticWrapper) runCommand(command string) error {
 			if len(r.progress) > 0 {
 				if r.profile.Backup.ExtendedStatus {
 					rCommand.scanOutput = shell.ScanBackupJson
-				} else if !term.OsStdoutIsTerminal() {
+				} else if !r.ctx.terminal.StdoutIsTerminal() {
 					// restic detects its output is not a terminal and no longer displays the monitor.
 					// Scan plain output only if resticprofile is not run from a terminal (e.g. schedule)
 					rCommand.scanOutput = shell.ScanBackupPlain
@@ -632,9 +628,9 @@ func (r *resticWrapper) runShellCommands(commands []string, commandsType, comman
 		// creating command
 		rCommand := newShellCommand(shellCommand, nil, env, r.getShell(), r.dryRun, r.sigChan, r.setPID)
 		// stdout are stderr are coming from the default terminal (in case they're redirected)
-		rCommand.stdout = term.GetOutput()
-		rCommand.stderr = term.GetErrorOutput()
-		term.FlushAllOutput()
+		rCommand.stdout = r.ctx.terminal.Stdout()
+		rCommand.stderr = r.ctx.terminal.Stderr()
+		r.ctx.terminal.FlushAllOutput()
 		_, stderr, err := runShellCommand(rCommand)
 		if err != nil {
 			err = fmt.Errorf("%s on profile '%s': %w", commandsType, r.profile.Name, err)
@@ -646,9 +642,8 @@ func (r *resticWrapper) runShellCommands(commands []string, commandsType, comman
 
 // runFinalShellCommands runs all shell commands defined in "run-finally".
 func (r *resticWrapper) runFinalShellCommands(command string, fail error) {
-	var commands []string
-
 	profileCommands, sectionCommands := r.profile.GetRunShellCommandsSections(command)
+	commands := make([]string, 0, len(sectionCommands.RunFinally)+len(profileCommands.RunFinally))
 	commands = append(commands, sectionCommands.RunFinally...)
 	commands = append(commands, profileCommands.RunFinally...)
 
@@ -663,9 +658,9 @@ func (r *resticWrapper) runFinalShellCommands(command string, fail error) {
 			// creating command
 			rCommand := newShellCommand(cmd, nil, env, r.getShell(), r.dryRun, r.sigChan, r.setPID)
 			// stdout are stderr are coming from the default terminal (in case they're redirected)
-			rCommand.stdout = term.GetOutput()
-			rCommand.stderr = term.GetErrorOutput()
-			term.FlushAllOutput()
+			rCommand.stdout = r.ctx.terminal.Stdout()
+			rCommand.stderr = r.ctx.terminal.Stderr()
+			r.ctx.terminal.FlushAllOutput()
 			_, _, err := runShellCommand(rCommand)
 			if err != nil {
 				clog.Errorf("run-finally command %d/%d failed ('%s' on profile '%s'): %s",
@@ -698,7 +693,7 @@ func (r *resticWrapper) sendFinally(monitoring config.SendMonitoringSections, co
 func (r *resticWrapper) sendMonitoring(sections []config.SendMonitoringSection, command, sendType string, err error) {
 	for i, section := range sections {
 		clog.Debugf("starting %q from %s %d/%d", sendType, command, i+1, len(sections))
-		term.FlushAllOutput()
+		r.ctx.terminal.FlushAllOutput()
 		err := r.sender.Send(section, r.getContextWithError(err), r.profile.GetEnvironment(true))
 		if err != nil {
 			clog.Warningf("%q returned an error: %s", sendType, err.Error())
@@ -795,7 +790,8 @@ func (r *resticWrapper) getErrorContext(err error) hook.ErrorContext {
 	}
 	ctx.Message = err.Error()
 
-	if fail, ok := err.(*commandError); ok {
+	fail := &commandError{}
+	if errors.As(err, &fail) {
 		exitCode := -1
 		if code, err := fail.ExitCode(); err == nil {
 			exitCode = code
@@ -865,10 +861,7 @@ func (r *resticWrapper) canRetryAfterRemoteLockFailure(output monitor.OutputAnal
 	staleConditionText := ""
 
 	if lockAge, ok := output.GetRemoteLockedSince(); ok {
-		requiredAge := r.global.ResticStaleLockAge
-		if requiredAge < constants.MinResticStaleLockAge {
-			requiredAge = constants.MinResticStaleLockAge
-		}
+		requiredAge := max(r.global.ResticStaleLockAge, constants.MinResticStaleLockAge)
 
 		staleLock = lockAge >= requiredAge
 		staleConditionText = fmt.Sprintf("lock age %s >= %s", lockAge, requiredAge)

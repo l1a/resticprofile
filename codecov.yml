@@ -1,9 +1,11 @@
 ignore:
+  - crond/mock/
   - shell/mock/
   - lock/test/
   - priority/check/
   - util/test_executable/
   - term/remote.go
+  - term/test/
   - deprecation.go
   - logger.go
   - systemd.go
@@ -14,14 +16,15 @@ ignore:
   - syslog_windows.go
   - schtasks/permission.go
   - user/user_systemd.go
+  - qemu/
   - "**/mocks/*.go"
 
 codecov:
   notify:
-    after_n_builds: 3
+    after_n_builds: 4
 
 comment:
-  after_n_builds: 3
+  after_n_builds: 4
 
 coverage:
   round: nearest

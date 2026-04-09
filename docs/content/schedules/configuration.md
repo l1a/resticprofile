@@ -75,9 +75,9 @@ profile:
 
 * `system`: Access system or protected files. Run resticprofile with `sudo` on Unix and with elevated prompt on Windows. On Windows, resticprofile will automatically request elevated permissions if needed.
 
-* `user`: Run the backup using current user permissions. Suitable for saving documents or files within your profile. **This mode runs even when the user is not logged on**. It will ask for your user password on Windows. It needs root permission (via sudo) when using `systemd`.
+* `user`: Run the backup using current user permissions. Suitable for saving documents or files within your profile. **This mode runs even when the user is not logged on**. It will ask for your user password on Windows. On Linux with `systemd`, this creates a system unit with `User=` set — it requires root permission (via sudo) to schedule, but the backup itself runs as the unprivileged user. If you want to schedule without sudo, use `user_logged_on` with [lingering](https://wiki.archlinux.org/title/Systemd/User#Automatic_start-up_of_systemd_user_instances) enabled instead.
 
-* `user_logged_on`: **Not for crond** - Provides the same permissions as `user`, but runs only when the user is logged on. On Windows, it does not ask for your user password.
+* `user_logged_on`: **Not for crond** - Provides the same permissions as `user`, but runs only when the user is logged on (unless [lingering](https://wiki.archlinux.org/title/Systemd/User#Automatic_start-up_of_systemd_user_instances) is enabled). On Linux with `systemd`, this creates a unit in the user's systemd profile (`~/.config/systemd/user/`) and does **not** require sudo to schedule. On Windows, it does not ask for your user password.
 
 * *empty*: resticprofile will guess based on how it was started (with sudo or as a normal user). The fallback is `system` on Windows and `user_logged_on` on other platforms.
 
@@ -200,6 +200,14 @@ To prevent that, set this option to `true` to hide the task window by wrapping t
 Note: It works only on Windows and makes sense only with `user_logged_on` permission.
 
 Note: The behavior of `conhost.exe` varies between Windows versions. It has been confirmed to work on Windows 11 (24H2) but not on Windows 10 (1607).
+
+## schedule-start-when-available
+
+When set to `true`, Windows Task Scheduler will start the task as soon as possible after a scheduled start is missed. This is useful when the computer might be asleep or off during the scheduled time.
+
+For example, if a backup is scheduled for 3:00 AM but the computer is off, enabling this option will run the backup when the computer is next available.
+
+Note: This option only works on Windows.
 
 ## Example 
 

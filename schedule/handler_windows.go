@@ -10,6 +10,7 @@ import (
 	"github.com/creativeprojects/resticprofile/constants"
 	"github.com/creativeprojects/resticprofile/schtasks"
 	"github.com/creativeprojects/resticprofile/shell"
+	"github.com/creativeprojects/resticprofile/term"
 	"github.com/creativeprojects/resticprofile/user"
 )
 
@@ -38,7 +39,7 @@ func (h *HandlerWindows) DisplaySchedules(profile, command string, schedules []s
 	if err != nil {
 		return err
 	}
-	displayParsedSchedules(profile, command, events)
+	displayParsedSchedules(term.Get(), profile, command, events)
 	return nil
 }
 
@@ -77,13 +78,14 @@ func (h *HandlerWindows) CreateJob(job *Config, schedules []*calendar.Event, per
 	}
 
 	jobConfig := &schtasks.Config{
-		ProfileName:      job.ProfileName,
-		CommandName:      job.CommandName,
-		Command:          command,
-		Arguments:        arguments.String(),
-		WorkingDirectory: job.WorkingDirectory,
-		JobDescription:   job.JobDescription,
-		RunLevel:         job.RunLevel,
+		ProfileName:        job.ProfileName,
+		CommandName:        job.CommandName,
+		Command:            command,
+		Arguments:          arguments.String(),
+		WorkingDirectory:   job.WorkingDirectory,
+		JobDescription:     job.JobDescription,
+		RunLevel:           job.RunLevel,
+		StartWhenAvailable: job.StartWhenAvailable,
 	}
 	err := schtasks.Create(jobConfig, schedules, perm)
 	if err != nil {
