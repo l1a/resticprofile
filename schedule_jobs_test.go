@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"testing"
+	"fmt"
 
 	"github.com/creativeprojects/resticprofile/calendar"
 	"github.com/creativeprojects/resticprofile/config"
@@ -44,8 +45,8 @@ func TestSimpleScheduleJob(t *testing.T) {
 		mock.AnythingOfType("[]*calendar.Event"),
 		schedule.PermissionUserBackground).
 		RunAndReturn(func(scheduleConfig *schedule.Config, events []*calendar.Event, permission schedule.Permission) error {
-			assert.Equal(t, []string{"--no-ansi", "--config", `config file`, "run-schedule", "backup@profile"}, scheduleConfig.Arguments.RawArgs())
-			assert.Equal(t, `--no-ansi --config "config file" run-schedule backup@profile`, scheduleConfig.Arguments.String())
+			assert.Equal(t, []string{"--no-ansi", "--config", getAbsoluteConfigFile("config file"), "run-schedule", "backup@profile"}, scheduleConfig.Arguments.RawArgs())
+			assert.Equal(t, fmt.Sprintf(`--no-ansi --config "%s" run-schedule backup@profile`, getAbsoluteConfigFile("config file")), scheduleConfig.Arguments.String())
 			return nil
 		})
 

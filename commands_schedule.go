@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -108,7 +109,6 @@ func createSchedule(ctx commandContext) error {
 
 // removeSchedule command
 func removeSchedule(ctx commandContext) error {
-	var err error
 	c := ctx.config
 	request := ctx.request
 	args := ctx.request.arguments
@@ -188,7 +188,7 @@ func statusSchedule(ctx commandContext) error {
 		profileName = ""
 	}
 	schedulerConfig := schedule.NewSchedulerConfig(ctx.global)
-	err := statusScheduledJobs(schedule.NewHandler(schedulerConfig), ctx.config.GetConfigFile(), profileName)
+	err := statusScheduledJobs(schedule.NewHandler(schedulerConfig), getAbsoluteConfigFile(ctx.config.GetConfigFile()), profileName)
 	if err != nil {
 		return retryElevated(err, ctx.flags)
 	}
@@ -373,4 +373,18 @@ func runSchedule(cmdCtx commandContext) error {
 		return err
 	}
 	return nil
+}
+
+func getAbsoluteConfigFile(configFile string) string {
+	if configFile == "" {
+		return ""
+	}
+	if filepath.IsAbs(configFile) {
+		return filepath.Clean(configFile)
+	}
+	currentDir, err := os.Getwd()
+	if err == nil {
+		return filepath.Clean(filepath.Join(currentDir, configFile))
+	}
+	return filepath.Clean(configFile)
 }
